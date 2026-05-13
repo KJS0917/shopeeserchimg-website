@@ -599,6 +599,33 @@
   let uploadedFile = null;
   let uploadedDataUrl = null;
 
+  function showUploadMenu(event) {
+  event.preventDefault();
+  document.getElementById('uploadMenu').style.display = 'flex';
+}
+
+function closeUploadMenu() {
+  document.getElementById('uploadMenu').style.display = 'none';
+}
+
+function triggerLibrary() {
+  closeUploadMenu();
+
+  const input = document.getElementById('fileInput');
+
+  input.removeAttribute('capture');
+  input.click();
+}
+
+function triggerCamera() {
+  closeUploadMenu();
+
+  const input = document.getElementById('fileInput');
+
+  input.setAttribute('capture', 'environment');
+  input.click();
+}
+
   // File input
   const fileInput = document.getElementById('fileInput');
   const uploadZone = document.getElementById('uploadZone');
