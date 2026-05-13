@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>以圖搜尋工具</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap');
+
+  :root {
+    --bg: #0f0f0f;
+    --surface: #1a1a1a;
+    --surface2: #242424;
+    --border: #2e2e2e;
+    --accent: #ff6b35;
+    --accent2: #00d4aa;
+    --text: #f0f0f0;
+    --text2: #888;
+    --google: #4285f4;
+    --shopee: #ee4d2d;
+    --radius: 12px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans TC', sans-serif;
+    min-height: 100vh;
+    padding-bottom: 40px;
+  }
+
+  header {
+    background: linear-gradient(135deg, #1a1a1a 0%, #0f0f0f 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 20px;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(10px);
+  }
+
+  header h1 {
+    font-family: 'Space Mono', monospace;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    color: var(--accent);
+  }
+
+  header p {
+    font-size: 11px;
+    color: var(--text2);
+    margin-top: 2px;
+  }
+
+  .container {
+    max-width: 600px;
+    margin: 0 auto;
+    padding: 20px 16px;
+  }
+
+  /* Upload Zone */
+  .upload-zone {
+    border: 2px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 32px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--surface);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--accent);
+    background: rgba(255, 107, 53, 0.05);
+  }
+
+  .upload-zone input[type="file"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+  }
+
+  .upload-icon {
+    font-size: 40px;
+    margin-bottom: 10px;
+    display: block;
+  }
+
+  .upload-zone .label {
+    font-size: 15px;
+    font-weight: 500;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+
+  .upload-zone .sublabel {
+    font-size: 12px;
+    color: var(--text2);
+  }
+
+  /* Preview */
+  .preview-wrap {
+    display: none;
+    position: relative;
+    border-radius: var(--radius);
+    overflow: hidden;
+    background: var(--surface);
+    border: 1px solid var(--border);
+  }
+
+  .preview-wrap.visible { display: block; }
+
+  .preview-wrap img {
+    width: 100%;
+    max-height: 280px;
+    object-fit: contain;
+    display: block;
+    background: #111;
+  }
+
+  .preview-actions {
+    display: flex;
+    gap: 8px;
+    padding: 12px;
+    background: var(--surface2);
+    border-top: 1px solid var(--border);
+  }
+
+  .btn-remove {
+    flex: 1;
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text2);
+    border-radius: 8px;
+    padding: 8px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s;
+  }
+
+  .btn-remove:hover { border-color: #ff4444; color: #ff4444; }
+
+  /* Search Buttons */
+  .search-section {
+    margin-top: 16px;
+  }
+
+  .section-label {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text2);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .search-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .btn-search {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 14px 16px;
+    border-radius: var(--radius);
+    font-family: 'Noto Sans TC', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    border: none;
+    transition: all 0.15s;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-search:active { transform: scale(0.97); }
+
+  .btn-google {
+    background: var(--google);
+    color: #fff;
+  }
+
+  .btn-google:hover { background: #3367d6; }
+
+  .btn-shopee {
+    background: var(--shopee);
+    color: #fff;
+  }
+
+  .btn-shopee:hover { background: #d44127; }
+
+  .btn-search svg {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+  }
+
+  .btn-search.disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  /* Divider */
+  .divider {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 24px 0 20px;
+  }
+
+  .divider-line {
+    flex: 1;
+    height: 1px;
+    background: var(--border);
+  }
+
+  .divider-text {
+    font-size: 11px;
+    color: var(--text2);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  /* Product Form */
+  .form-group {
+    margin-bottom: 14px;
+  }
+
+  .form-group label {
+    display: block;
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--text2);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    margin-bottom: 6px;
+  }
+
+  .form-group input,
+  .form-group textarea,
+  .form-group select {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: 'Noto Sans TC', sans-serif;
+    font-size: 14px;
+    padding: 10px 12px;
+    outline: none;
+    transition: border-color 0.2s;
+    resize: vertical;
+  }
+
+  .form-group input:focus,
+  .form-group textarea:focus,
+  .form-group select:focus {
+    border-color: var(--accent);
+  }
+
+  .form-group input::placeholder,
+  .form-group textarea::placeholder {
+    color: #444;
+  }
+
+  .form-group textarea { min-height: 80px; }
+
+  .form-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  /* Copy Output */
+  .copy-section {
+    margin-top: 8px;
+  }
+
+  .output-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  .output-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: var(--surface2);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .output-header span {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--text2);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .output-preview {
+    padding: 14px;
+    font-size: 13px;
+    line-height: 1.7;
+    color: var(--text);
+    white-space: pre-wrap;
+    word-break: break-word;
+    min-height: 60px;
+    max-height: 220px;
+    overflow-y: auto;
+  }
+
+  .output-preview.empty { color: var(--text2); font-style: italic; }
+
+  .copy-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    padding: 10px 12px;
+    background: var(--surface2);
+    border-top: 1px solid var(--border);
+  }
+
+  .btn-copy {
+    background: var(--accent2);
+    color: #000;
+    border: none;
+    border-radius: 8px;
+    padding: 10px;
+    font-family: 'Noto Sans TC', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .btn-copy:hover { background: #00bfa3; }
+  .btn-copy:active { transform: scale(0.97); }
+  .btn-copy.copied { background: #444; color: var(--text2); }
+
+  .btn-copy-title {
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+
+  .btn-copy-title:hover { border-color: var(--accent2); color: var(--accent2); }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(80px);
+    background: var(--accent2);
+    color: #000;
+    padding: 10px 20px;
+    border-radius: 40px;
+    font-size: 13px;
+    font-weight: 700;
+    transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    z-index: 999;
+    white-space: nowrap;
+  }
+
+  .toast.show { transform: translateX(-50%) translateY(0); }
+
+  /* URL input section */
+  .url-mode {
+    margin-top: 12px;
+  }
+
+  .url-toggle {
+    background: none;
+    border: 1px dashed var(--border);
+    color: var(--text2);
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    width: 100%;
+    transition: all 0.2s;
+  }
+
+  .url-toggle:hover { border-color: var(--accent); color: var(--accent); }
+
+  .url-input-wrap {
+    display: none;
+    margin-top: 10px;
+    gap: 8px;
+    flex-direction: column;
+  }
+
+  .url-input-wrap.visible { display: flex; }
+
+  .url-input-wrap input {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: monospace;
+    font-size: 12px;
+    padding: 10px 12px;
+    outline: none;
+  }
+
+  .url-input-wrap input:focus { border-color: var(--accent); }
+
+  .url-search-btns {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🔍 以圖搜尋工具</h1>
+  <p>Google 圖片搜尋 & 蝦皮以圖搜尋 + 商品資訊複製</p>
+</header>
+
+<div class="container">
+
+  <!-- Upload Zone -->
+  <!-- Hidden inputs -->
+  <input type="file" id="fileInput" accept="image/*" style="display:none">
+
+  <div class="upload-zone" id="uploadZone" onclick="showUploadMenu(event)">
+    <span class="upload-icon">📷</span>
+    <div class="label">點擊選擇圖片</div>
+    <div class="sublabel">相機拍照 或 從相簿選取</div>
+  </div>
+
+  <!-- Upload menu -->
+  <div id="uploadMenu" style="display:none; position:fixed; inset:0; z-index:200; background:rgba(0,0,0,0.6); align-items:flex-end;">
+    <div style="background:#1a1a1a; border-radius:16px 16px 0 0; width:100%; padding:20px 16px 36px;">
+      <div style="text-align:center; font-size:12px; color:#666; margin-bottom:16px; letter-spacing:0.08em; text-transform:uppercase;">選擇圖片來源</div>
+      <button onclick="triggerCamera()" style="display:flex; align-items:center; gap:14px; width:100%; background:#242424; border:1px solid #2e2e2e; border-radius:12px; color:#f0f0f0; font-family:'Noto Sans TC',sans-serif; font-size:15px; padding:16px; margin-bottom:10px; cursor:pointer;">
+        <span style="font-size:24px;">📷</span> 拍照
+      </button>
+      <button onclick="triggerLibrary()" style="display:flex; align-items:center; gap:14px; width:100%; background:#242424; border:1px solid #2e2e2e; border-radius:12px; color:#f0f0f0; font-family:'Noto Sans TC',sans-serif; font-size:15px; padding:16px; margin-bottom:10px; cursor:pointer;">
+        <span style="font-size:24px;">🖼️</span> 從相簿選取
+      </button>
+      <button onclick="closeUploadMenu()" style="display:flex; align-items:center; justify-content:center; width:100%; background:transparent; border:1px solid #2e2e2e; border-radius:12px; color:#888; font-family:'Noto Sans TC',sans-serif; font-size:14px; padding:14px; cursor:pointer;">
+        取消
+      </button>
+    </div>
+  </div>
+
+  <!-- Preview -->
+  <div class="preview-wrap" id="previewWrap">
+    <img id="previewImg" src="" alt="預覽">
+    <div class="preview-actions">
+      <button class="btn-remove" onclick="removeImage()">✕ 移除圖片</button>
+    </div>
+  </div>
+
+  <!-- URL Mode -->
+  <div class="url-mode">
+    <button class="url-toggle" onclick="toggleUrlMode()">🔗 改用圖片網址搜尋</button>
+    <div class="url-input-wrap" id="urlInputWrap">
+      <input type="url" id="imageUrlInput" placeholder="貼上圖片網址 https://...">
+      <div class="url-search-btns">
+        <button class="btn-search btn-google" onclick="searchByUrl('google')">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+          Google
+        </button>
+        <button class="btn-search btn-shopee" onclick="searchByUrl('shopee')">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+          蝦皮
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Search Buttons (for uploaded image) -->
+  <div class="search-section" id="searchSection" style="display:none; margin-top:16px;">
+    <div class="section-label">以圖搜尋</div>
+    <div class="search-buttons">
+      <button class="btn-search btn-google" id="btnGoogle" onclick="searchImage('google')">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+        Google 以圖搜尋
+      </button>
+      <button class="btn-search btn-shopee" id="btnShopee" onclick="searchImage('shopee')">
+        <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 2v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-1V2h-2v2H8V2H6zm-1 6h14v12H5V8zm2 2v2h2v-2H7zm4 0v2h2v-2h-2zm4 0v2h2v-2h-2z"/></svg>
+        蝦皮以圖搜尋
+      </button>
+    </div>
+  </div>
+
+  <!-- Divider -->
+  <div class="divider">
+    <div class="divider-line"></div>
+    <div class="divider-text">商品資訊</div>
+    <div class="divider-line"></div>
+  </div>
+
+  <!-- Product Form -->
+  <div class="form-group">
+    <label>商品標題</label>
+    <input type="text" id="prodTitle" placeholder="例：Nike Air Max 270 男款運動鞋">
+  </div>
+
+  <div class="form-row">
+    <div class="form-group">
+      <label>價格</label>
+      <input type="text" id="prodPrice" placeholder="例：NT$ 2,990">
+    </div>
+    <div class="form-group">
+      <label>狀況</label>
+      <select id="prodCondition">
+        <option value="">-- 選擇 --</option>
+        <option>全新</option>
+        <option>近全新</option>
+        <option>9成新</option>
+        <option>8成新</option>
+        <option>7成新</option>
+        <option>二手</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="form-row">
+    <div class="form-group">
+      <label>尺寸 / 規格</label>
+      <input type="text" id="prodSize" placeholder="例：US 10 / 28cm">
+    </div>
+    <div class="form-group">
+      <label>顏色</label>
+      <input type="text" id="prodColor" placeholder="例：黑白配色">
+    </div>
+  </div>
+
+  <div class="form-group">
+    <label>商品描述</label>
+    <textarea id="prodDesc" placeholder="詳細描述商品狀況、購買來源、是否附配件等..."></textarea>
+  </div>
+
+  <div class="form-group">
+    <label>交易方式</label>
+    <input type="text" id="prodShipping" placeholder="例：7-11取貨付款、面交（台北）、郵寄">
+  </div>
+
+  <div class="form-group">
+    <label>聯絡方式</label>
+    <input type="text" id="prodContact" placeholder="例：歡迎私訊詢問">
+  </div>
+
+  <!-- Copy Output -->
+  <div class="copy-section">
+    <div class="section-label" style="margin-bottom:10px;">預覽 & 複製</div>
+    <div class="output-box">
+      <div class="output-header">
+        <span>商品內容</span>
+        <span id="charCount" style="font-family:'Space Mono',monospace">0 字</span>
+      </div>
+      <div class="output-preview" id="outputPreview">
+        <span class="empty">填寫上方欄位後，內容將自動顯示於此...</span>
+      </div>
+      <div class="copy-buttons">
+        <button class="btn-copy" onclick="copyAll()" id="btnCopyAll">
+          📋 複製全部
+        </button>
+        <button class="btn-copy btn-copy-title" onclick="copyTitle()" id="btnCopyTitle">
+          📝 只複製標題
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+  let uploadedFile = null;
+  let uploadedDataUrl = null;
+
+  // File input
+  const fileInput = document.getElementById('fileInput');
+  const uploadZone = document.getElementById('uploadZone');
+
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) handleFile(file);
+  });
+
+  // Drag and drop
+  uploadZone.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    uploadZone.classList.add('drag-over');
+  });
+  uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
+  uploadZone.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadZone.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file && file.type.startsWith('image/')) handleFile(file);
+  });
+
+  function handleFile(file) {
+    uploadedFile = file;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      uploadedDataUrl = e.target.result;
+      document.getElementById('previewImg').src = uploadedDataUrl;
+      document.getElementById('previewWrap').classList.add('visible');
+      uploadZone.style.display = 'none';
+      document.getElementById('searchSection').style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function removeImage() {
+    uploadedFile = null;
+    uploadedDataUrl = null;
+    document.getElementById('previewWrap').classList.remove('visible');
+    uploadZone.style.display = '';
+    document.getElementById('searchSection').style.display = 'none';
+    fileInput.value = '';
+  }
+
+  // URL mode toggle
+  function toggleUrlMode() {
+    const wrap = document.getElementById('urlInputWrap');
+    wrap.classList.toggle('visible');
+  }
+
+  function searchByUrl(engine) {
+    const url = document.getElementById('imageUrlInput').value.trim();
+    if (!url) { showToast('請輸入圖片網址'); return; }
+    if (engine === 'google') {
+      window.open('https://lens.google.com/uploadbyurl?url=' + encodeURIComponent(url), '_blank');
+    } else {
+      window.open('https://shopee.tw/search?image=' + encodeURIComponent(url), '_blank');
+    }
+  }
+
+  // Search with uploaded image
+  function searchImage(engine) {
+    if (!uploadedFile && !uploadedDataUrl) {
+      showToast('請先上傳圖片');
+      return;
+    }
+
+    if (engine === 'google') {
+      // Google Lens: use form upload
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = 'https://lens.google.com/v3/upload';
+      form.enctype = 'multipart/form-data';
+      form.target = '_blank';
+      form.style.display = 'none';
+
+      // Try direct file upload via hidden form
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.name = 'encoded_image';
+
+      document.body.appendChild(form);
+
+      // Use Blob from dataURL
+      fetch(uploadedDataUrl)
+        .then(r => r.blob())
+        .then(blob => {
+          const dt = new DataTransfer();
+          dt.items.add(new File([blob], uploadedFile ? uploadedFile.name : 'image.jpg', { type: blob.type }));
+          input.files = dt.files;
+          form.appendChild(input);
+          form.submit();
+          document.body.removeChild(form);
+        });
+    } else if (engine === 'shopee') {
+      // Shopee: upload via their API endpoint
+      showToast('正在開啟蝦皮以圖搜尋...');
+      
+      fetch(uploadedDataUrl)
+        .then(r => r.blob())
+        .then(blob => {
+          const formData = new FormData();
+          formData.append('file', blob, uploadedFile ? uploadedFile.name : 'image.jpg');
+          
+          // Open Shopee image search page
+          // Since Shopee requires login for direct API, open the page
+          const shopeeUrl = 'https://shopee.tw/';
+          const newWin = window.open(shopeeUrl, '_blank');
+          showToast('請在蝦皮頁面點選相機圖示上傳圖片');
+        });
+    }
+  }
+
+  // Alternative simpler approach for Shopee
+  function searchImage(engine) {
+    if (!uploadedDataUrl) {
+      showToast('請先上傳圖片');
+      return;
+    }
+
+    if (engine === 'google') {
+      doGoogleSearch();
+    } else {
+      doShopeeSearch();
+    }
+  }
+
+  function doGoogleSearch() {
+    showToast('正在開啟 Google Lens...');
+    fetch(uploadedDataUrl)
+      .then(r => r.blob())
+      .then(blob => {
+        const file = new File([blob], 'search.jpg', { type: blob.type });
+        const formData = new FormData();
+        formData.append('encoded_image', file);
+        formData.append('image_content', '');
+        formData.append('filename', 'search.jpg');
+        formData.append('hl', 'zh-TW');
+
+        // Create and submit a hidden form for Google Lens
+        const iframe = document.createElement('iframe');
+        iframe.name = 'google_upload';
+        iframe.style.display = 'none';
+        document.body.appendChild(iframe);
+
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = 'https://lens.google.com/v3/upload?hl=zh-TW&re=df&st=' + Date.now() + '&ep=gsbubb';
+        form.enctype = 'multipart/form-data';
+        form.target = '_blank';
+        form.style.display = 'none';
+
+        const inputFile = document.createElement('input');
+        inputFile.type = 'file';
+        inputFile.name = 'encoded_image';
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        inputFile.files = dt.files;
+        form.appendChild(inputFile);
+        document.body.appendChild(form);
+        form.submit();
+        setTimeout(() => {
+          document.body.removeChild(form);
+          document.body.removeChild(iframe);
+        }, 3000);
+      });
+  }
+
+  function doShopeeSearch() {
+    showToast('正在上傳至蝦皮以圖搜尋...');
+    fetch(uploadedDataUrl)
+      .then(r => r.blob())
+      .then(blob => {
+        const file = new File([blob], 'search.jpg', { type: blob.type });
+        const formData = new FormData();
+        formData.append('file', file);
+
+        // Shopee image upload API
+        fetch('https://shopee.tw/api/v2/image/upload', {
+          method: 'POST',
+          body: formData,
+          mode: 'no-cors'
+        }).catch(() => {});
+
+        // Open Shopee visual search page directly
+        window.open('https://shopee.tw/search?by=image', '_blank');
+        showToast('已開啟蝦皮，請點選相機圖示');
+      });
+  }
+
+  // Form live update
+  const formFields = ['prodTitle', 'prodPrice', 'prodCondition', 'prodSize', 'prodColor', 'prodDesc', 'prodShipping', 'prodContact'];
+  formFields.forEach(id => {
+    const el = document.getElementById(id);
+    el.addEventListener('input', updateOutput);
+    el.addEventListener('change', updateOutput);
+  });
+
+  function updateOutput() {
+    const title = v('prodTitle');
+    const price = v('prodPrice');
+    const condition = v('prodCondition');
+    const size = v('prodSize');
+    const color = v('prodColor');
+    const desc = v('prodDesc');
+    const shipping = v('prodShipping');
+    const contact = v('prodContact');
+
+    const lines = [];
+    if (title) lines.push('📦 ' + title);
+    if (price) lines.push('💰 售價：' + price);
+    if (condition) lines.push('🏷️ 狀況：' + condition);
+    if (size) lines.push('📐 尺寸/規格：' + size);
+    if (color) lines.push('🎨 顏色：' + color);
+    if (desc) lines.push('\n📋 商品描述：\n' + desc);
+    if (shipping) lines.push('\n🚚 交易方式：' + shipping);
+    if (contact) lines.push('📱 ' + contact);
+
+    const preview = document.getElementById('outputPreview');
+    if (lines.length === 0) {
+      preview.innerHTML = '<span class="empty">填寫上方欄位後，內容將自動顯示於此...</span>';
+      document.getElementById('charCount').textContent = '0 字';
+    } else {
+      const text = lines.join('\n');
+      preview.textContent = text;
+      preview.classList.remove('empty');
+      document.getElementById('charCount').textContent = text.length + ' 字';
+    }
+  }
+
+  function v(id) {
+    return document.getElementById(id).value.trim();
+  }
+
+  function buildFullText() {
+    const lines = [];
+    const title = v('prodTitle');
+    const price = v('prodPrice');
+    const condition = v('prodCondition');
+    const size = v('prodSize');
+    const color = v('prodColor');
+    const desc = v('prodDesc');
+    const shipping = v('prodShipping');
+    const contact = v('prodContact');
+
+    if (title) lines.push('📦 ' + title);
+    if (price) lines.push('💰 售價：' + price);
+    if (condition) lines.push('🏷️ 狀況：' + condition);
+    if (size) lines.push('📐 尺寸/規格：' + size);
+    if (color) lines.push('🎨 顏色：' + color);
+    if (desc) lines.push('\n📋 商品描述：\n' + desc);
+    if (shipping) lines.push('\n🚚 交易方式：' + shipping);
+    if (contact) lines.push('📱 ' + contact);
+    return lines.join('\n');
+  }
+
+  function copyAll() {
+    const text = buildFullText();
+    if (!text) { showToast('請先填寫商品資訊'); return; }
+    navigator.clipboard.writeText(text).then(() => {
+      showToast('✅ 已複製全部內容！');
+      const btn = document.getElementById('btnCopyAll');
+      btn.textContent = '✅ 已複製！';
+      btn.classList.add('copied');
+      setTimeout(() => {
+        btn.innerHTML = '📋 複製全部';
+        btn.classList.remove('copied');
+      }, 2000);
+    });
+  }
+
+  function copyTitle() {
+    const title = v('prodTitle');
+    if (!title) { showToast('請先填寫商品標題'); return; }
+    navigator.clipboard.writeText(title).then(() => {
+      showToast('✅ 已複製標題！');
+    });
+  }
+
+  function showToast(msg) {
+    const toast = document.getElementById('toast');
+    toast.textContent = msg;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2500);
+  }
+</script>
+</body>
+</html>
