@@ -444,30 +444,11 @@
 <div class="container">
 
   <!-- Upload Zone -->
-  <!-- Hidden inputs -->
-  <input type="file" id="fileInput" accept="image/*" style="display:none">
-  <input type="file" id="fileInputCamera" accept="image/*" style="display:none">
-
-  <div class="upload-zone" id="uploadZone" onclick="showUploadMenu(event)">
+  <div class="upload-zone" id="uploadZone">
+    <input type="file" id="fileInput" accept="image/*" style="position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer;">
     <span class="upload-icon">📷</span>
-    <div class="label">點擊選擇圖片</div>
-    <div class="sublabel">相機拍照 或 從相簿選取</div>
-  </div>
-
-  <!-- Upload menu -->
-  <div id="uploadMenu" style="display:none; position:fixed; inset:0; z-index:200; background:rgba(0,0,0,0.6); align-items:flex-end;">
-    <div style="background:#1a1a1a; border-radius:16px 16px 0 0; width:100%; padding:20px 16px 36px;">
-      <div style="text-align:center; font-size:12px; color:#666; margin-bottom:16px; letter-spacing:0.08em; text-transform:uppercase;">選擇圖片來源</div>
-      <button onclick="triggerCamera()" style="display:flex; align-items:center; gap:14px; width:100%; background:#242424; border:1px solid #2e2e2e; border-radius:12px; color:#f0f0f0; font-family:'Noto Sans TC',sans-serif; font-size:15px; padding:16px; margin-bottom:10px; cursor:pointer;">
-        <span style="font-size:24px;">📷</span> 拍照
-      </button>
-      <button onclick="triggerLibrary()" style="display:flex; align-items:center; gap:14px; width:100%; background:#242424; border:1px solid #2e2e2e; border-radius:12px; color:#f0f0f0; font-family:'Noto Sans TC',sans-serif; font-size:15px; padding:16px; margin-bottom:10px; cursor:pointer;">
-        <span style="font-size:24px;">🖼️</span> 從相簿選取
-      </button>
-      <button onclick="closeUploadMenu()" style="display:flex; align-items:center; justify-content:center; width:100%; background:transparent; border:1px solid #2e2e2e; border-radius:12px; color:#888; font-family:'Noto Sans TC',sans-serif; font-size:14px; padding:14px; cursor:pointer;">
-        取消
-      </button>
-    </div>
+    <div class="label">點擊上傳圖片</div>
+    <div class="sublabel">拍照 或 從相簿選取</div>
   </div>
 
   <!-- Preview -->
@@ -593,6 +574,19 @@
 
 </div>
 
+<!-- Google Guide -->
+<div id="googleGuide" style="display:none; position:fixed; bottom:80px; left:50%; transform:translateX(-50%); z-index:998; width:calc(100% - 32px); max-width:400px;">
+  <div style="background:#242424; border:1px solid #4285f4; border-radius:14px; padding:16px 18px;">
+    <div style="font-size:13px; font-weight:700; color:#4285f4; margin-bottom:8px;">🔍 Google Lens 步驟</div>
+    <div style="font-size:12px; color:#ccc; line-height:1.8;">
+      1️⃣ 圖片已自動下載到手機<br>
+      2️⃣ 在 Google Lens 頁面點選 📷 相機圖示<br>
+      3️⃣ 選「從相簿上傳」，選剛下載的圖片
+    </div>
+    <button onclick="document.getElementById('googleGuide').style.display='none'" style="margin-top:10px; background:transparent; border:1px solid #444; border-radius:8px; color:#888; font-size:12px; padding:6px 14px; cursor:pointer; font-family:inherit;">知道了</button>
+  </div>
+</div>
+
 <!-- Shopee Guide -->
 <div id="shopeeGuide" style="display:none; position:fixed; bottom:80px; left:50%; transform:translateX(-50%); z-index:998; width:calc(100% - 32px); max-width:400px;">
   <div style="background:#242424; border:1px solid #ee4d2d; border-radius:14px; padding:16px 18px;">
@@ -613,34 +607,8 @@
   let uploadedFile = null;
   let uploadedDataUrl = null;
 
-  // ── Upload menu ──────────────────────────────────────────
-  function showUploadMenu(e) {
-    e.stopPropagation();
-    const menu = document.getElementById('uploadMenu');
-    menu.style.display = 'flex';
-  }
-  function closeUploadMenu() {
-    document.getElementById('uploadMenu').style.display = 'none';
-  }
-  function triggerCamera() {
-    closeUploadMenu();
-    document.getElementById('fileInputCamera').click();
-  }
-  function triggerLibrary() {
-    closeUploadMenu();
-    document.getElementById('fileInput').click();
-  }
-  // Close menu when tapping backdrop
-  document.getElementById('uploadMenu').addEventListener('click', function(e) {
-    if (e.target === this) closeUploadMenu();
-  });
-
-  // ── File inputs ──────────────────────────────────────────
+  // ── File input ───────────────────────────────────────────
   document.getElementById('fileInput').addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (file) handleFile(file);
-  });
-  document.getElementById('fileInputCamera').addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (file) handleFile(file);
   });
@@ -676,7 +644,6 @@
     uploadZone.style.display = '';
     document.getElementById('searchSection').style.display = 'none';
     document.getElementById('fileInput').value = '';
-    document.getElementById('fileInputCamera').value = '';
   }
 
   // ── URL mode ─────────────────────────────────────────────
@@ -705,34 +672,30 @@
   }
 
   function doGoogleSearch() {
-    showToast('⏳ 正在開啟 Google Lens...');
+    // Download the image first, then open Google Lens for manual upload
     fetch(uploadedDataUrl)
       .then(r => r.blob())
       .then(blob => {
-        const fname = (uploadedFile && uploadedFile.name) ? uploadedFile.name : 'search.jpg';
-        const file = new File([blob], fname, { type: blob.type });
+        // Trigger image download so user has the file ready
+        const fname = (uploadedFile && uploadedFile.name) ? uploadedFile.name : 'search-image.jpg';
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = fname;
+        a.click();
+        URL.revokeObjectURL(a.href);
 
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = 'https://lens.google.com/v3/upload?hl=zh-TW&re=df&st=' + Date.now() + '&ep=gsbubb';
-        form.enctype = 'multipart/form-data';
-        form.target = '_blank';
-        form.style.display = 'none';
-
-        const inputFile = document.createElement('input');
-        inputFile.type = 'file';
-        inputFile.name = 'encoded_image';
-        const dt = new DataTransfer();
-        dt.items.add(file);
-        inputFile.files = dt.files;
-
-        form.appendChild(inputFile);
-        document.body.appendChild(form);
-        form.submit();
-        setTimeout(() => document.body.removeChild(form), 3000);
-        showToast('✅ 已開啟 Google Lens！');
+        // Open Google Lens upload page
+        setTimeout(() => {
+          window.open('https://lens.google.com/', '_blank');
+          showGoogleGuide();
+        }, 500);
       })
       .catch(() => showToast('❌ 發生錯誤，請重試'));
+  }
+
+  function showGoogleGuide() {
+    document.getElementById('googleGuide').style.display = 'flex';
+    setTimeout(() => document.getElementById('googleGuide').style.display = 'none', 8000);
   }
 
   function doShopeeSearch() {
