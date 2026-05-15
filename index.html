@@ -446,6 +446,7 @@
   <!-- Upload Zone -->
   <!-- Hidden inputs -->
   <input type="file" id="fileInput" accept="image/*" style="display:none">
+  <input type="file" id="fileInputCamera" accept="image/*" style="display:none">
 
   <div class="upload-zone" id="uploadZone" onclick="showUploadMenu(event)">
     <span class="upload-icon">📷</span>
@@ -592,6 +593,19 @@
 
 </div>
 
+<!-- Shopee Guide -->
+<div id="shopeeGuide" style="display:none; position:fixed; bottom:80px; left:50%; transform:translateX(-50%); z-index:998; width:calc(100% - 32px); max-width:400px;">
+  <div style="background:#242424; border:1px solid #ee4d2d; border-radius:14px; padding:16px 18px;">
+    <div style="font-size:13px; font-weight:700; color:#ee4d2d; margin-bottom:8px;">🛒 蝦皮以圖搜尋步驟</div>
+    <div style="font-size:12px; color:#ccc; line-height:1.8;">
+      1️⃣ 圖片已複製到剪貼簿<br>
+      2️⃣ 在蝦皮頁面點選搜尋框旁的 📷 相機圖示<br>
+      3️⃣ 選擇「從相簿」上傳，或貼上圖片
+    </div>
+    <button onclick="document.getElementById('shopeeGuide').style.display='none'" style="margin-top:10px; background:transparent; border:1px solid #444; border-radius:8px; color:#888; font-size:12px; padding:6px 14px; cursor:pointer; font-family:inherit;">知道了</button>
+  </div>
+</div>
+
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
@@ -599,47 +613,41 @@
   let uploadedFile = null;
   let uploadedDataUrl = null;
 
-  function showUploadMenu(event) {
-  event.preventDefault();
-  document.getElementById('uploadMenu').style.display = 'flex';
-}
+  // ── Upload menu ──────────────────────────────────────────
+  function showUploadMenu(e) {
+    e.stopPropagation();
+    const menu = document.getElementById('uploadMenu');
+    menu.style.display = 'flex';
+  }
+  function closeUploadMenu() {
+    document.getElementById('uploadMenu').style.display = 'none';
+  }
+  function triggerCamera() {
+    closeUploadMenu();
+    document.getElementById('fileInputCamera').click();
+  }
+  function triggerLibrary() {
+    closeUploadMenu();
+    document.getElementById('fileInput').click();
+  }
+  // Close menu when tapping backdrop
+  document.getElementById('uploadMenu').addEventListener('click', function(e) {
+    if (e.target === this) closeUploadMenu();
+  });
 
-function closeUploadMenu() {
-  document.getElementById('uploadMenu').style.display = 'none';
-}
-
-function triggerLibrary() {
-  closeUploadMenu();
-
-  const input = document.getElementById('fileInput');
-
-  input.removeAttribute('capture');
-  input.click();
-}
-
-function triggerCamera() {
-  closeUploadMenu();
-
-  const input = document.getElementById('fileInput');
-
-  input.setAttribute('capture', 'environment');
-  input.click();
-}
-
-  // File input
-  const fileInput = document.getElementById('fileInput');
-  const uploadZone = document.getElementById('uploadZone');
-
-  fileInput.addEventListener('change', (e) => {
+  // ── File inputs ──────────────────────────────────────────
+  document.getElementById('fileInput').addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (file) handleFile(file);
+  });
+  document.getElementById('fileInputCamera').addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (file) handleFile(file);
   });
 
-  // Drag and drop
-  uploadZone.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    uploadZone.classList.add('drag-over');
-  });
+  // Drag and drop (desktop)
+  const uploadZone = document.getElementById('uploadZone');
+  uploadZone.addEventListener('dragover', (e) => { e.preventDefault(); uploadZone.classList.add('drag-over'); });
   uploadZone.addEventListener('dragleave', () => uploadZone.classList.remove('drag-over'));
   uploadZone.addEventListener('drop', (e) => {
     e.preventDefault();
@@ -667,13 +675,13 @@ function triggerCamera() {
     document.getElementById('previewWrap').classList.remove('visible');
     uploadZone.style.display = '';
     document.getElementById('searchSection').style.display = 'none';
-    fileInput.value = '';
+    document.getElementById('fileInput').value = '';
+    document.getElementById('fileInputCamera').value = '';
   }
 
-  // URL mode toggle
+  // ── URL mode ─────────────────────────────────────────────
   function toggleUrlMode() {
-    const wrap = document.getElementById('urlInputWrap');
-    wrap.classList.toggle('visible');
+    document.getElementById('urlInputWrap').classList.toggle('visible');
   }
 
   function searchByUrl(engine) {
@@ -682,94 +690,27 @@ function triggerCamera() {
     if (engine === 'google') {
       window.open('https://lens.google.com/uploadbyurl?url=' + encodeURIComponent(url), '_blank');
     } else {
-      window.open('https://shopee.tw/search?image=' + encodeURIComponent(url), '_blank');
+      // Shopee URL mode: copy URL and open Shopee
+      navigator.clipboard.writeText(url).catch(() => {});
+      window.open('https://shopee.tw/search?by=image', '_blank');
+      showToast('已複製網址，請在蝦皮貼上');
     }
   }
 
-  // Search with uploaded image
+  // ── Image search ─────────────────────────────────────────
   function searchImage(engine) {
-    if (!uploadedFile && !uploadedDataUrl) {
-      showToast('請先上傳圖片');
-      return;
-    }
-
-    if (engine === 'google') {
-      // Google Lens: use form upload
-      const form = document.createElement('form');
-      form.method = 'POST';
-      form.action = 'https://lens.google.com/v3/upload';
-      form.enctype = 'multipart/form-data';
-      form.target = '_blank';
-      form.style.display = 'none';
-
-      // Try direct file upload via hidden form
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.name = 'encoded_image';
-
-      document.body.appendChild(form);
-
-      // Use Blob from dataURL
-      fetch(uploadedDataUrl)
-        .then(r => r.blob())
-        .then(blob => {
-          const dt = new DataTransfer();
-          dt.items.add(new File([blob], uploadedFile ? uploadedFile.name : 'image.jpg', { type: blob.type }));
-          input.files = dt.files;
-          form.appendChild(input);
-          form.submit();
-          document.body.removeChild(form);
-        });
-    } else if (engine === 'shopee') {
-      // Shopee: upload via their API endpoint
-      showToast('正在開啟蝦皮以圖搜尋...');
-      
-      fetch(uploadedDataUrl)
-        .then(r => r.blob())
-        .then(blob => {
-          const formData = new FormData();
-          formData.append('file', blob, uploadedFile ? uploadedFile.name : 'image.jpg');
-          
-          // Open Shopee image search page
-          // Since Shopee requires login for direct API, open the page
-          const shopeeUrl = 'https://shopee.tw/';
-          const newWin = window.open(shopeeUrl, '_blank');
-          showToast('請在蝦皮頁面點選相機圖示上傳圖片');
-        });
-    }
-  }
-
-  // Alternative simpler approach for Shopee
-  function searchImage(engine) {
-    if (!uploadedDataUrl) {
-      showToast('請先上傳圖片');
-      return;
-    }
-
-    if (engine === 'google') {
-      doGoogleSearch();
-    } else {
-      doShopeeSearch();
-    }
+    if (!uploadedDataUrl) { showToast('請先上傳圖片'); return; }
+    if (engine === 'google') doGoogleSearch();
+    else doShopeeSearch();
   }
 
   function doGoogleSearch() {
-    showToast('正在開啟 Google Lens...');
+    showToast('⏳ 正在開啟 Google Lens...');
     fetch(uploadedDataUrl)
       .then(r => r.blob())
       .then(blob => {
-        const file = new File([blob], 'search.jpg', { type: blob.type });
-        const formData = new FormData();
-        formData.append('encoded_image', file);
-        formData.append('image_content', '');
-        formData.append('filename', 'search.jpg');
-        formData.append('hl', 'zh-TW');
-
-        // Create and submit a hidden form for Google Lens
-        const iframe = document.createElement('iframe');
-        iframe.name = 'google_upload';
-        iframe.style.display = 'none';
-        document.body.appendChild(iframe);
+        const fname = (uploadedFile && uploadedFile.name) ? uploadedFile.name : 'search.jpg';
+        const file = new File([blob], fname, { type: blob.type });
 
         const form = document.createElement('form');
         form.method = 'POST';
@@ -784,101 +725,86 @@ function triggerCamera() {
         const dt = new DataTransfer();
         dt.items.add(file);
         inputFile.files = dt.files;
+
         form.appendChild(inputFile);
         document.body.appendChild(form);
         form.submit();
-        setTimeout(() => {
-          document.body.removeChild(form);
-          document.body.removeChild(iframe);
-        }, 3000);
-      });
+        setTimeout(() => document.body.removeChild(form), 3000);
+        showToast('✅ 已開啟 Google Lens！');
+      })
+      .catch(() => showToast('❌ 發生錯誤，請重試'));
   }
 
   function doShopeeSearch() {
-    showToast('正在上傳至蝦皮以圖搜尋...');
+    // Step 1: copy image to clipboard, Step 2: open Shopee image search
     fetch(uploadedDataUrl)
       .then(r => r.blob())
-      .then(blob => {
-        const file = new File([blob], 'search.jpg', { type: blob.type });
-        const formData = new FormData();
-        formData.append('file', file);
-
-        // Shopee image upload API
-        fetch('https://shopee.tw/api/v2/image/upload', {
-          method: 'POST',
-          body: formData,
-          mode: 'no-cors'
-        }).catch(() => {});
-
-        // Open Shopee visual search page directly
-        window.open('https://shopee.tw/search?by=image', '_blank');
-        showToast('已開啟蝦皮，請點選相機圖示');
+      .then(async blob => {
+        // Try clipboard write (supported on modern mobile Chrome/Safari)
+        try {
+          const item = new ClipboardItem({ [blob.type]: blob });
+          await navigator.clipboard.write([item]);
+          showToast('✅ 圖片已複製！正在開啟蝦皮...');
+        } catch {
+          showToast('⏳ 正在開啟蝦皮以圖搜尋...');
+        }
+        setTimeout(() => {
+          window.open('https://shopee.tw/search?by=image', '_blank');
+          // Show instruction toast after a moment
+          setTimeout(() => showShopeeGuide(), 800);
+        }, 600);
       });
   }
 
-  // Form live update
-  const formFields = ['prodTitle', 'prodPrice', 'prodCondition', 'prodSize', 'prodColor', 'prodDesc', 'prodShipping', 'prodContact'];
+  function showShopeeGuide() {
+    const guide = document.getElementById('shopeeGuide');
+    guide.style.display = 'flex';
+    setTimeout(() => guide.style.display = 'none', 6000);
+  }
+
+  // ── Product form ─────────────────────────────────────────
+  const formFields = ['prodTitle','prodPrice','prodCondition','prodSize','prodColor','prodDesc','prodShipping','prodContact'];
   formFields.forEach(id => {
     const el = document.getElementById(id);
-    el.addEventListener('input', updateOutput);
-    el.addEventListener('change', updateOutput);
+    if (el) {
+      el.addEventListener('input', updateOutput);
+      el.addEventListener('change', updateOutput);
+    }
   });
 
   function updateOutput() {
-    const title = v('prodTitle');
-    const price = v('prodPrice');
-    const condition = v('prodCondition');
-    const size = v('prodSize');
-    const color = v('prodColor');
-    const desc = v('prodDesc');
-    const shipping = v('prodShipping');
-    const contact = v('prodContact');
-
-    const lines = [];
-    if (title) lines.push('📦 ' + title);
-    if (price) lines.push('💰 售價：' + price);
-    if (condition) lines.push('🏷️ 狀況：' + condition);
-    if (size) lines.push('📐 尺寸/規格：' + size);
-    if (color) lines.push('🎨 顏色：' + color);
-    if (desc) lines.push('\n📋 商品描述：\n' + desc);
-    if (shipping) lines.push('\n🚚 交易方式：' + shipping);
-    if (contact) lines.push('📱 ' + contact);
-
+    const text = buildFullText();
     const preview = document.getElementById('outputPreview');
-    if (lines.length === 0) {
+    if (!text) {
       preview.innerHTML = '<span class="empty">填寫上方欄位後，內容將自動顯示於此...</span>';
       document.getElementById('charCount').textContent = '0 字';
     } else {
-      const text = lines.join('\n');
       preview.textContent = text;
-      preview.classList.remove('empty');
       document.getElementById('charCount').textContent = text.length + ' 字';
     }
   }
 
-  function v(id) {
-    return document.getElementById(id).value.trim();
-  }
+  function v(id) { return document.getElementById(id).value.trim(); }
 
   function buildFullText() {
     const lines = [];
-    const title = v('prodTitle');
-    const price = v('prodPrice');
+    const title     = v('prodTitle');
+    const price     = v('prodPrice');
     const condition = v('prodCondition');
-    const size = v('prodSize');
-    const color = v('prodColor');
-    const desc = v('prodDesc');
-    const shipping = v('prodShipping');
-    const contact = v('prodContact');
+    const size      = v('prodSize');
+    const color     = v('prodColor');
+    const desc      = v('prodDesc');
+    const shipping  = v('prodShipping');
+    const contact   = v('prodContact');
 
-    if (title) lines.push('📦 ' + title);
-    if (price) lines.push('💰 售價：' + price);
+    if (title)     lines.push('📦 ' + title);
+    if (price)     lines.push('💰 售價：' + price);
     if (condition) lines.push('🏷️ 狀況：' + condition);
-    if (size) lines.push('📐 尺寸/規格：' + size);
-    if (color) lines.push('🎨 顏色：' + color);
-    if (desc) lines.push('\n📋 商品描述：\n' + desc);
-    if (shipping) lines.push('\n🚚 交易方式：' + shipping);
-    if (contact) lines.push('📱 ' + contact);
+    if (size)      lines.push('📐 尺寸/規格：' + size);
+    if (color)     lines.push('🎨 顏色：' + color);
+    if (desc)      lines.push('\n📋 商品描述：\n' + desc);
+    if (shipping)  lines.push('\n🚚 交易方式：' + shipping);
+    if (contact)   lines.push('📱 ' + contact);
     return lines.join('\n');
   }
 
@@ -890,26 +816,22 @@ function triggerCamera() {
       const btn = document.getElementById('btnCopyAll');
       btn.textContent = '✅ 已複製！';
       btn.classList.add('copied');
-      setTimeout(() => {
-        btn.innerHTML = '📋 複製全部';
-        btn.classList.remove('copied');
-      }, 2000);
+      setTimeout(() => { btn.innerHTML = '📋 複製全部'; btn.classList.remove('copied'); }, 2000);
     });
   }
 
   function copyTitle() {
     const title = v('prodTitle');
     if (!title) { showToast('請先填寫商品標題'); return; }
-    navigator.clipboard.writeText(title).then(() => {
-      showToast('✅ 已複製標題！');
-    });
+    navigator.clipboard.writeText(title).then(() => showToast('✅ 已複製標題！'));
   }
 
+  // ── Toast ─────────────────────────────────────────────────
   function showToast(msg) {
     const toast = document.getElementById('toast');
     toast.textContent = msg;
     toast.classList.add('show');
-    setTimeout(() => toast.classList.remove('show'), 2500);
+    setTimeout(() => toast.classList.remove('show'), 2800);
   }
 </script>
 </body>
