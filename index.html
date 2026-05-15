@@ -19,6 +19,7 @@
     --google: #4285f4;
     --shopee: #ee4d2d;
     --radius: 12px;
+    --ai: #7c3aed;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -384,6 +385,40 @@
 
   .toast.show { transform: translateX(-50%) translateY(0); }
 
+  .btn-ai-analyze {
+    width: 100%;
+    background: linear-gradient(135deg, #7c3aed, #a855f7);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius);
+    padding: 16px;
+    font-family: 'Noto Sans TC', sans-serif;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: all 0.2s;
+    box-shadow: 0 4px 20px rgba(124,58,237,0.3);
+  }
+  .btn-ai-analyze:active { transform: scale(0.98); }
+  .btn-ai-analyze.loading {
+    background: #333;
+    box-shadow: none;
+    cursor: not-allowed;
+  }
+  .spinner {
+    width: 16px; height: 16px;
+    border: 2px solid rgba(255,255,255,0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    display: inline-block;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
   /* URL input section */
   .url-mode {
     margin-top: 12px;
@@ -477,17 +512,20 @@
     </div>
   </div>
 
-  <!-- Search Buttons (for uploaded image) -->
-  <div class="search-section" id="searchSection" style="display:none; margin-top:16px;">
-    <div class="section-label">以圖搜尋</div>
-    <div class="search-buttons">
-      <button class="btn-search btn-google" id="btnGoogle" onclick="searchImage('google')">
+  <!-- AI Analyze Button -->
+  <div id="searchSection" style="display:none; margin-top:16px;">
+    <button class="btn-ai-analyze" id="btnAnalyze" onclick="analyzeImage()">
+      <span id="analyzeIcon">✨</span>
+      <span id="analyzeText">AI 辨識商品並自動填入</span>
+    </button>
+    <div class="search-buttons" style="margin-top:10px;">
+      <button class="btn-search btn-google" onclick="searchImage('google')">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
-        Google 以圖搜尋
+        Google Lens
       </button>
-      <button class="btn-search btn-shopee" id="btnShopee" onclick="searchImage('shopee')">
+      <button class="btn-search btn-shopee" onclick="searchImage('shopee')">
         <svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 2v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-1V2h-2v2H8V2H6zm-1 6h14v12H5V8zm2 2v2h2v-2H7zm4 0v2h2v-2h-2zm4 0v2h2v-2h-2z"/></svg>
-        蝦皮以圖搜尋
+        蝦皮搜尋
       </button>
     </div>
   </div>
@@ -669,6 +707,74 @@
     if (!uploadedDataUrl) { showToast('請先上傳圖片'); return; }
     if (engine === 'google') doGoogleSearch();
     else doShopeeSearch();
+  }
+
+  // ── AI Image Analysis ────────────────────────────────────
+  async function analyzeImage() {
+    if (!uploadedDataUrl) { showToast('請先上傳圖片'); return; }
+
+    const btn = document.getElementById('btnAnalyze');
+    const icon = document.getElementById('analyzeIcon');
+    const text = document.getElementById('analyzeText');
+    btn.classList.add('loading');
+    icon.innerHTML = '<span class="spinner"></span>';
+    text.textContent = 'AI 辨識中，請稍候...';
+
+    // Extract base64 from dataURL
+    const base64 = uploadedDataUrl.split(',')[1];
+    const mediaType = uploadedDataUrl.split(';')[0].split(':')[1] || 'image/jpeg';
+
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          messages: [{
+            role: 'user',
+            content: [
+              {
+                type: 'image',
+                source: { type: 'base64', media_type: mediaType, data: base64 }
+              },
+              {
+                type: 'text',
+                text: `請辨識這張圖片中的商品，並以 JSON 格式回傳以下欄位（只回傳 JSON，不要其他文字）：
+{
+  "title": "完整商品名稱（品牌+型號+顏色等）",
+  "price": "台灣二手市場建議售價，格式如 NT$ 1,500（若不確定填空字串）",
+  "size": "尺寸或規格（若有）",
+  "color": "顏色（若有）",
+  "desc": "商品描述，約50-80字，包含品牌特色、適用對象、商品亮點"
+}`
+              }
+            ]
+          }]
+        })
+      });
+
+      const data = await response.json();
+      const raw = data.content.find(b => b.type === 'text')?.text || '';
+      const clean = raw.replace(/```json|```/g, '').trim();
+      const info = JSON.parse(clean);
+
+      // Fill in fields
+      if (info.title) document.getElementById('prodTitle').value = info.title;
+      if (info.price) document.getElementById('prodPrice').value = info.price;
+      if (info.size)  document.getElementById('prodSize').value = info.size;
+      if (info.color) document.getElementById('prodColor').value = info.color;
+      if (info.desc)  document.getElementById('prodDesc').value = info.desc;
+      updateOutput();
+      showToast('✅ 商品資訊已自動填入！');
+    } catch (e) {
+      showToast('❌ 辨識失敗，請重試');
+      console.error(e);
+    } finally {
+      btn.classList.remove('loading');
+      icon.textContent = '✨';
+      text.textContent = 'AI 重新辨識';
+    }
   }
 
   function doGoogleSearch() {
